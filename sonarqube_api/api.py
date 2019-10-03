@@ -26,6 +26,7 @@ class SonarAPIHandler(object):
     RULES_LIST_ENDPOINT = '/api/rules/search'
     RULES_CREATE_ENDPOINT = '/api/rules/create'
     PROJECTS_ENDPOINT = '/api/projects/search'
+    ISSUES_ENDPOINT = '/api/issues/search'
 
     # Debt data params (characteristics and metric)
     DEBT_CHARACTERISTICS = (
@@ -93,7 +94,10 @@ class SonarAPIHandler(object):
         # Get method and make the call
         call = getattr(self._session, method.lower())
         url = self._get_url(endpoint)
-        res = call(url, data=data or {})
+        if method == 'get':
+            res = call(url, params=data or {})
+        else:
+            res = call(url, data=data or {})
 
         # Analyse response status and return or raise exception
         # Note: redirects are followed automatically by requests
@@ -291,16 +295,16 @@ class SonarAPIHandler(object):
         # Page counters
         page_num = 1
         page_size = 1
-        n_projects = 2
+        count = 2
 
         # Cycle through rules
-        while page_num * page_size < n_projects:
+        while page_num * page_size < count:
             # Update paging information for calculation
             res = self._make_call('get', self.PROJECTS_ENDPOINT, **qs).json()
             paging = res['paging']
             page_num = paging['pageIndex']
             page_size = paging['pageSize']
-            n_projects = paging['total']
+            count = paging['total']
 
             # Update page number (next) in queryset
             qs['p'] = page_num + 1
@@ -308,6 +312,44 @@ class SonarAPIHandler(object):
             # Yield projects
             for project in res['components']:
                 yield project
+
+    def get_issues(self, componentKeys=None, onComponentOnly=None):
+        """
+        Yield projects.
+
+        :param component: component key
+        :return: generator that yields measure data dicts
+        """
+        # Build the queryset
+        qs = {}
+
+        # Add params
+        if componentKeys:
+            qs.update({'componentKeys': componentKeys})
+        if onComponentOnly:
+            qs.update({'onComponentOnly': onComponentOnly})
+
+        # Page counters
+        page_num = 1
+        page_size = 1
+        count = 2
+
+        # Cycle through rules
+        while page_num * page_size < count:
+            # Update paging information for calculation
+            res = self._make_call('get', self.ISSUES_ENDPOINT, **qs).json()
+            paging = res['paging']
+            page_num = paging['pageIndex']
+            page_size = paging['pageSize']
+            count = paging['total']
+
+            # Update page number (next) in queryset
+            qs['p'] = page_num + 1
+
+            # Yield projects
+            #print(res)
+            for issue in res['issues']:
+                yield issue
 
 
     def get_resources_debt(self, resource=None, categories=None,
