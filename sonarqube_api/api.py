@@ -25,6 +25,7 @@ class SonarAPIHandler(object):
     RULES_ACTIVATION_ENDPOINT = '/api/qualityprofiles/activate_rule'
     RULES_LIST_ENDPOINT = '/api/rules/search'
     RULES_CREATE_ENDPOINT = '/api/rules/create'
+    PROJECTS_ENDPOINT = '/api/projects/search'
 
     # Debt data params (characteristics and metric)
     DEBT_CHARACTERISTICS = (
@@ -111,6 +112,7 @@ class SonarAPIHandler(object):
 
         elif res.status_code < 500:
             # Other 4xx, generic client error
+            print('{} {}'.format(url, res))
             raise ClientError(res.reason)
 
         else:
@@ -266,6 +268,47 @@ class SonarAPIHandler(object):
             # Yield rules
             for rule in res['rules']:
                 yield rule
+
+    def get_projects(self, projects=None, qualifiers=None, onProvisionedOnly=None):
+        """
+        Yield projects.
+
+        :param projects: filter by project
+        :param qualifiers: filter by project qualifiers
+        :return: generator that yields project data dicts
+        """
+        # Build the queryset
+        qs = {}
+
+        # Add params
+        if projects:
+            qs.update({'projects': projects})
+        if qualifiers:
+            qs.update({'qualifiers': qualifiers})
+        if onProvisionedOnly:
+            qs.update({'onProvisionedOnly': onProvisionedOnly})
+
+        # Page counters
+        page_num = 1
+        page_size = 1
+        n_projects = 2
+
+        # Cycle through rules
+        while page_num * page_size < n_projects:
+            # Update paging information for calculation
+            res = self._make_call('get', self.PROJECTS_ENDPOINT, **qs).json()
+            paging = res['paging']
+            page_num = paging['pageIndex']
+            page_size = paging['pageSize']
+            n_projects = paging['total']
+
+            # Update page number (next) in queryset
+            qs['p'] = page_num + 1
+
+            # Yield projects
+            for project in res['components']:
+                yield project
+
 
     def get_resources_debt(self, resource=None, categories=None,
                            include_trends=False, include_modules=False):
