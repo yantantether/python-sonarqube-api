@@ -27,6 +27,7 @@ class SonarAPIHandler(object):
     RULES_CREATE_ENDPOINT = '/api/rules/create'
     PROJECTS_ENDPOINT = '/api/projects/search'
     ISSUES_ENDPOINT = '/api/issues/search'
+    RULE_ENDPOINT = '/api/rules/show'
 
     # Debt data params (characteristics and metric)
     DEBT_CHARACTERISTICS = (
@@ -335,7 +336,7 @@ class SonarAPIHandler(object):
         count = 2
 
         # Cycle through rules
-        while page_num * page_size < count:
+        while page_num * page_size < min(count, 10000):
             # Update paging information for calculation
             res = self._make_call('get', self.ISSUES_ENDPOINT, **qs).json()
             paging = res['paging']
@@ -350,6 +351,20 @@ class SonarAPIHandler(object):
             #print(res)
             for issue in res['issues']:
                 yield issue
+
+
+    def get_rule(self, ruleKey):
+        """
+        Yield projects.
+
+        :param component: component key
+        :return: generator that yields measure data dicts
+        """
+        # Build the queryset
+        qs = {'key': ruleKey}
+
+        res = self._make_call('get', self.RULE_ENDPOINT, **qs).json()
+        return res['rule']
 
 
     def get_resources_debt(self, resource=None, categories=None,
